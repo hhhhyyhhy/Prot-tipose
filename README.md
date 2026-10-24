@@ -1,7 +1,12 @@
 # Turno das 3h
 
 Jogo de mistério no navegador: oito noites no caixa de uma conveniência de posto na serra.
-Tudo em um arquivo (`index.html`), sem build.
+Tudo em um arquivo (`index.html`), sem build. O site pode ser instalado como aplicativo
+(Edge/Chrome: ícone de instalar na barra de endereço) e funciona sem internet depois da primeira visita.
+
+## Notebooks mais simples (ex.: Galaxy Book Go)
+
+Na tela inicial, marque **Gráficos leves**. O jogo também liga sozinho se perceber que está lento.
 
 ## Hospedar no Render
 

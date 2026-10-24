@@ -5,11 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1216">
 <meta name="description" content="Turno das 3h: oito noites no caixa de um posto na serra. Um jogo de mistério no navegador.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <style>body{margin:0}[hidden]{display:none!important}</style>
 <title>Turno das 3h</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=Karla:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>if ("serviceWorker" in navigator && location.protocol === "https:") window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));</script>
 </head>
 <body>
 <style>
@@ -303,6 +307,14 @@ button { font: inherit; color: inherit; }
   .vend-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .viewtabs button { padding: 6px 11px; font-size: 15px; }
 }
+@media (min-width: 761px) and (max-height: 760px) {
+  .stage { min-height: 250px; }
+  .topbar { padding-block: 6px; }
+  .clock { font-size: 34px; }
+  .hud { padding-block: 10px 12px; gap: 10px 18px; }
+  .act { min-height: 48px; padding: 7px 10px 8px; }
+  .helper { padding: 5px 10px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .title-big { animation: none; }
   .radio.live .freq i { animation: none; }
@@ -407,6 +419,7 @@ button { font: inherit; color: inherit; }
     </div>
     <div class="row">
       <label class="opt"><input type="checkbox" id="optVoice"> Voz do locutor (sintetizada, se o navegador tiver)</label>
+      <label class="opt"><input type="checkbox" id="optLight"> Gráficos leves (para notebooks mais simples)</label>
     </div>
   </div>
 </div>
@@ -2335,15 +2348,24 @@ const cv = $("#scene"), cx = cv.getContext("2d");
 const cam = $("#cam"), camx = cam.getContext("2d");
 let W = 0, H = 0, DPR = 1;
 let drops = [], beads = [];
+// Light graphics for slower laptops (e.g. ARM notebooks): set by the player or switched on when frames run slow.
+const LIGHT_KEY = "turno3h-light";
+let LIGHT = (() => { try { return localStorage.getItem(LIGHT_KEY) === "1"; } catch (e) { return false; } })();
+let lightChosen = (() => { try { return localStorage.getItem(LIGHT_KEY) !== null; } catch (e) { return false; } })();
+function setLight(on, byPlayer) {
+  LIGHT = on; if (byPlayer) lightChosen = true;
+  try { if (byPlayer || on) localStorage.setItem(LIGHT_KEY, on ? "1" : "0"); } catch (e) {}
+  $("#optLight").checked = on; resize();
+}
 const specks = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: rand(0.6, 2.2), a: rand(0.25, 0.6) }));
 const shelfItems = Array.from({ length: 33 }, (_, i) => ({ c: pick(["#7d3b2f", "#2f5d73", "#a0812f", "#3f6b3b", "#6a3b66", "#b45f2a", "#c9c2a8"]), h: rand(0.6, 1), i }));
 const crumbs = Array.from({ length: 12 }, () => ({ x: rand(-0.4, 0.4), y: rand(-0.3, 0.3), r: rand(1, 2.5) }));
 function resize() {
   const r = cv.parentElement.getBoundingClientRect();
-  DPR = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height;
+  DPR = Math.min(LIGHT ? 1 : 2, window.devicePixelRatio || 1); W = r.width; H = r.height;
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); cx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  drops = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), l: rand(0.02, 0.05), s: rand(0.9, 1.5) }));
-  beads = Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random(), r: rand(1, 3.2), v: rand(0, 0.004) }));
+  drops = Array.from({ length: LIGHT ? 90 : 220 }, () => ({ x: Math.random(), y: Math.random(), l: rand(0.02, 0.05), s: rand(0.9, 1.5) }));
+  beads = Array.from({ length: LIGHT ? 20 : 46 }, () => ({ x: Math.random(), y: Math.random(), r: rand(1, 3.2), v: rand(0, 0.004) }));
 }
 function mix(a, b, k) {
   const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
@@ -2857,7 +2879,8 @@ function displayClock() { return S.frozen > 0 ? "02:22" : clockStr(S.min); }
 /* =========================================================
    Main loop
    ========================================================= */
-let last = performance.now(), camAcc = 0, uiAcc = 0, statusAcc = 0, blinkNext = 0;
+let last = performance.now(), camAcc = 0, uiAcc = 0, statusAcc = 0, blinkNext = 0, drawAcc = 0;
+const slowFrames = []; // frame times while a night is running, to detect a slow machine once
 function frame(now) {
   const dt = Math.min(100, now - last) / 1000; last = now;
   if (S && running && !journalOpen) {
@@ -2891,8 +2914,16 @@ function frame(now) {
   }
   for (const d of drops) { d.y += d.s * dt * 1.4; if (d.y > 1.05) { d.y = -0.05; d.x = Math.random(); } }
   for (const b of beads) { b.y += b.v * dt * 4; if (b.y > 1) { b.y = 0; b.x = Math.random(); } }
-  if (W) { if (S && S.view === "salao") drawSalao(now); else drawCaixa(now); }
-  camAcc += dt * 1000; if (camAcc > 120) { camAcc = 0; drawCam(now); }
+  drawAcc += dt;
+  if (W && (!LIGHT || drawAcc >= 1 / 32)) { drawAcc = 0; if (S && S.view === "salao") drawSalao(now); else drawCaixa(now); }
+  camAcc += dt * 1000; if (camAcc > (LIGHT ? 250 : 120)) { camAcc = 0; drawCam(now); }
+  if (!LIGHT && !lightChosen && S && running && !S.paused && !document.hidden && slowFrames.length < 180) {
+    slowFrames.push(dt);
+    if (slowFrames.length === 180) {
+      const sorted = [...slowFrames].sort((a, b) => a - b);
+      if (sorted[90] > 0.028) { setLight(true, false); toast("Este computador está com dificuldade. Liguei os gráficos leves (dá pra mudar na tela inicial)."); }
+    }
+  }
   uiAcc += dt * 1000; if (uiAcc > 150) { uiAcc = 0; if (S) renderUI(); }
   statusAcc += dt * 1000; if (statusAcc > 5000) { statusAcc = 0; pushStatus(); }
   requestAnimationFrame(frame);
@@ -2913,7 +2944,7 @@ function renderUI() {
   $("#goalBar").style.width = clamp(S.cash / goal * 100, 0, 100) + "%";
   $("#goalBar").parentElement.classList.toggle("met", S.cash >= goal);
   $("#vignette").style.opacity = S.energy < 40 ? String(clamp((40 - S.energy) / 40, 0, 0.9)) : "0";
-  cv.style.filter = S.energy < 12 && !REDUCED ? "blur(1px) saturate(.7)" : "";
+  cv.style.filter = S.energy < 12 && !REDUCED && !LIGHT ? "blur(1px) saturate(.7)" : "";
   $("#monitor").classList.toggle("alert", !!S.monitorFigure);
   $("#monitor").hidden = S.view === "salao"; // the corridor camera screen sits at the till
   const c = S.customer, busy = S.paused || S.dozing;
@@ -3061,6 +3092,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "7") { const b = $("#actions .ctx"); if (b && !b.disabled) { e.preventDefault(); b.click(); } }
 });
 $("#soundBtn").addEventListener("click", () => { audio.resume(); const on = audio.toggle(); $("#soundBtn").setAttribute("aria-pressed", String(on)); $("#soundBtn").textContent = on ? "Som" : "Mudo"; });
+$("#optLight").checked = LIGHT;
+$("#optLight").addEventListener("change", (e) => setLight(e.target.checked, true));
 $("#optVoice").addEventListener("change", (e) => { voiceOn = e.target.checked; if (!voiceOn && "speechSynthesis" in window) speechSynthesis.cancel(); });
 
 const saved = load();
