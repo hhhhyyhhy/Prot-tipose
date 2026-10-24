@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: turno-das-3h
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
