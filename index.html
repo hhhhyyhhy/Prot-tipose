@@ -205,7 +205,7 @@ button { font: inherit; color: inherit; }
 .act small { font-size: 11.5px; color: var(--mute); }
 .act kbd { position: absolute; right: 8px; top: 7px; font-family: var(--f-mono); font-size: 10.5px; color: var(--mute); }
 .act:hover:not(:disabled) { border-color: #3a5158; background: #1a2a30; }
-.act:disabled { opacity: .38; cursor: not-allowed; }
+.act:disabled { opacity: .5; cursor: not-allowed; }
 .act.primary:not(:disabled) { border-color: var(--sodium); background: #2a2014; box-shadow: inset 0 0 0 1px rgba(242,164,70,.25); }
 .act.primary:not(:disabled) b { color: var(--sodium); }
 .act.ctx { border-color: var(--alarm); background: #2a1715; }
@@ -820,7 +820,7 @@ const DIALOGS = {
   } },
   cida3: { who: "cida", start: "a", nodes: {
     a: { t: "Dona Cida chega pouco antes das três. Sem guarda-chuva, de batom, o cabelo solto.\n— Hoje eu vim pra ficar até o fim.",
-      ch: [{ t: "Levar ela até a mesa da janela", go: null, fx: () => { seatAfter(200, "cida"); people("Dona Cida chegou arrumada pouco antes das três."); } }] },
+      ch: [{ t: "Levar ela até a mesa da janela", go: null, fx: () => { F().cidaCame = true; seatAfter(200, "cida"); people("Dona Cida chegou arrumada pouco antes das três."); } }] },
   } },
 
   /* ---------- Tiago, the nursing student ---------- */
@@ -910,27 +910,43 @@ const DIALOGS = {
 
   /* ---------- random nightly events ---------- */
   ladrao: { who: "ladrao", start: "a", nodes: {
-    a: { t: "Um rapaz de moletom anda devagar pelo corredor dos chocolates. Quando você olha de novo, os bolsos do casaco estão estufados e ele vai direto pra porta, sem passar no caixa.",
+    a: { t: () => {
+        const n = seen("ladrao"), last = F().ladraoFim;
+        if (n <= 1) return "Um rapaz de moletom anda devagar pelo corredor dos chocolates. Quando você olha de novo, os bolsos do casaco estão estufados e ele vai direto pra porta, sem passar no caixa.";
+        if (n === 2) return last === "pagou" ? "O rapaz de moletom de novo, o dos chocolates. Ele finge ler as revistas, mas não tira o olho da prateleira. Quando você pisca, os bolsos já estão cheios e ele vai pra porta."
+          : last === "juninho" ? "O rapaz de moletom volta. Olha pro Juninho, olha pra você e, mesmo assim, enche os bolsos e anda rápido pra porta."
+          : "Ele de novo: o rapaz de moletom que levou os chocolates. Dessa vez nem disfarça. Enche os bolsos e anda pra porta.";
+        return pick([
+          "Chuva, madrugada e o rapaz de moletom no corredor dos chocolates, como se tivesse horário marcado. Os bolsos estufam. Ele vai pra porta.",
+          "O rapaz de moletom entra com o capuz pingando. Hoje são as balas do balcão: ele enfia um punhado no bolso e vira pra porta.",
+          "De novo o moletom. Ele para na porta, te encara um segundo, e você vê o volume no bolso do casaco.",
+        ]);
+      },
       ch: [
         { t: "“Ei! Volta aqui e paga isso.”", go: () => (Math.random() < 0.6 ? "pays" : "runs"), fx: () => { S.energy -= 4; } },
         { t: "Pedir pro Juninho segurar a porta", if: () => helperOn() && !helperOnPhone(), go: "caught" },
         { t: "Fingir que não viu", go: "let" },
       ] },
-    pays: { t: "Ele trava, vermelho.\n— Foi mal, foi mal…\nTira os chocolates do bolso e paga, contando moeda.",
-      ch: [{ t: "Registrar a venda", go: null, fx: () => { S.cash += 15; audio.beep(); people("Um rapaz tentou sair com chocolate no bolso. Você chamou, e ele pagou."); } }] },
+    pays: { t: () => (seen("ladrao") <= 1 ? "Ele trava, vermelho.\n— Foi mal, foi mal…\nTira os chocolates do bolso e paga, contando moeda." : "Ele para com a mão na maçaneta.\n— Tá, tá. Você sempre vê.\nPaga contando moeda, sem olhar pra você."),
+      ch: [{ t: "Registrar a venda", go: null, fx: () => { F().ladraoFim = "pagou"; S.cash += 15; audio.beep(); people("Um rapaz tentou sair com chocolate no bolso. Você chamou, e ele pagou."); } }] },
     runs: { t: "Ele sai correndo pro escuro. A porta fica balançando.\nUns quinze reais em chocolate a menos na prateleira.",
-      ch: [{ t: "…", go: null, fx: () => { S.stock = Math.max(0, S.stock - 8); people("Um rapaz de moletom fugiu com chocolate sem pagar."); } }] },
+      ch: [{ t: "…", go: null, fx: () => { F().ladraoFim = "fugiu"; S.stock = Math.max(0, S.stock - 8); people("Um rapaz de moletom fugiu com chocolate sem pagar."); } }] },
     caught: { t: "O Juninho se planta na frente da porta, de braços cruzados. O rapaz devolve tudo no balcão e sai de cabeça baixa.\n— Ninguém passa por mim, chefe.",
-      ch: [{ t: "Rir", go: null, fx: () => people("O Juninho segurou a porta e um rapaz devolveu os chocolates que tinha escondido.") }] },
+      ch: [{ t: "Rir", go: null, fx: () => { F().ladraoFim = "juninho"; people("O Juninho segurou a porta e um rapaz devolveu os chocolates que tinha escondido."); } }] },
     let: { t: "Você olha pro outro lado. O sino da porta toca e ele some na chuva.",
-      ch: [{ t: "…", go: null, fx: () => { S.stock = Math.max(0, S.stock - 8); people("Você deixou um rapaz sair com chocolate sem pagar."); } }] },
+      ch: [{ t: "…", go: null, fx: () => { F().ladraoFim = "fugiu"; S.stock = Math.max(0, S.stock - 8); people("Você deixou um rapaz sair com chocolate sem pagar."); } }] },
   } },
   ze: { who: "ze", start: "a", nodes: {
-    a: { t: "Seu Zé, conhecido de todo posto da serra, entra cantando baixinho.\n— Ô meu filho… um café e um pão de queijo. Mas hoje tô sem nada. Anota aí no caderno que amanhã eu pago, palavra de honra.",
+    a: { t: () => ({
+        pagou: "Seu Zé entra de camisa limpa, todo sorridente.\n— O caderno tá zerado, né? Paguei tudinho. Então pode anotar mais um café e um pão de queijo, que eu sou homem de palavra.",
+        fiado: "Seu Zé chega meio sem jeito, o boné na mão.\n— Ainda te devo aquele, eu sei… Mas hoje a coisa apertou de novo. Anota mais um? Na semana eu acerto tudo.",
+        pago: "— O anjo de uniforme! — Seu Zé abre os braços na porta. — Hoje eu tô sem nada de novo, meu filho. Um café e um pão de queijo, e amanhã eu acerto, palavra.",
+        nao: "Seu Zé encosta no balcão, rindo antes de falar.\n— Já sei, já sei: regra é regra. Mas olha essa chuva… Um café e um pão de queijo, e amanhã eu acerto. Palavra de honra.",
+      })[F().zeFim] || "Seu Zé, conhecido de todo posto da serra, entra cantando baixinho.\n— Ô meu filho… um café e um pão de queijo. Mas hoje tô sem nada. Anota aí no caderno que amanhã eu pago, palavra de honra.",
       ch: [
-        { t: "Anotar no caderno (fiado)", go: "fiado", fx: () => { F().zeFiado = S.night; if (hasCoffee()) S.pot -= CUP(); if (hasSnack()) S.estufa -= SNACK(); } },
-        { t: "Pagar do seu bolso (R$ 11,00)", go: "pago", fx: () => { G.wallet = (G.wallet || 0) - 11; sell(["cafe", "pao"]); } },
-        { t: "“Sem dinheiro, sem café, Seu Zé.”", go: "nao" },
+        { t: "Anotar no caderno (fiado)", go: "fiado", fx: () => { F().zeFiado = S.night; F().zeFim = "fiado"; if (hasCoffee()) S.pot -= CUP(); if (hasSnack()) S.estufa -= SNACK(); } },
+        { t: "Pagar do seu bolso (R$ 11,00)", go: "pago", fx: () => { F().zeFim = "pago"; G.wallet = (G.wallet || 0) - 11; sell(["cafe", "pao"]); } },
+        { t: "“Sem dinheiro, sem café, Seu Zé.”", go: "nao", fx: () => { F().zeFim = "nao"; } },
       ] },
     fiado: { t: "— Deus te pague! Amanhã eu volto, pode escrever.\nEle toma o café devagar, contando uma história de caminhão que você não entende direito.",
       ch: [{ t: "Voltar ao caixa", go: null, fx: () => people("Seu Zé tomou café fiado e jurou pagar na noite seguinte.") }] },
@@ -939,25 +955,38 @@ const DIALOGS = {
   } },
   zePaga: { who: "ze", start: "a", nodes: {
     a: { t: "Seu Zé aparece de cabelo penteado e camisa limpa.\n— Falei que voltava!\nEle põe uma nota de vinte no balcão.\n— Fica com o troco. Pelo fiado e pela paciência.",
-      ch: [{ t: "Agradecer", go: null, fx: () => { S.cash += 20; audio.beep(); F().zePaid = true; people("Seu Zé voltou e pagou o fiado com vinte reais."); } }] },
+      ch: [{ t: "Agradecer", go: null, fx: () => { S.cash += 20; audio.beep(); F().zePaid = true; F().zeFim = "pagou"; people("Seu Zé voltou e pagou o fiado com vinte reais."); } }] },
   } },
   fiscal: { who: "fiscal", start: "a", nodes: {
-    a: { t: "Uma mulher de jaleco mostra um crachá e uma prancheta.\n— Vigilância sanitária. Inspeção de rotina, não vai demorar.",
+    a: { t: () => {
+        const n = seen("fiscal");
+        if (n <= 1) return "Uma mulher de jaleco mostra um crachá e uma prancheta.\n— Vigilância sanitária. Inspeção de rotina, não vai demorar.";
+        if (n === 2) return "A fiscal da vigilância de novo, com a mesma prancheta.\n— Inspeção de surpresa, como manda o regulamento. " + (F().fiscalFim === "multa" ? "Da última vez teve multa. Vamos ver se melhorou." : "Da última vez estava tudo em ordem. Vamos ver se continua.");
+        return "A fiscal já entra cumprimentando, sacudindo o guarda-chuva.\n— Boa noite de novo. Você já sabe como funciona: chão e mesas.";
+      },
       ch: [{ t: "Acompanhar a inspeção", go: () => (inspectionPasses() ? "ok" : "bad") }] },
     ok: { t: "Ela passa o dedo no balcão, olha as mesas, abre a estufa e o bule.\n— Tudo em ordem. Vou anotar um elogio pro dono. É raro de madrugada.",
-      ch: [{ t: "Assinar o relatório", go: null, fx: () => { S.fiscalBonus = 25; people("A fiscal da vigilância aprovou a loja. O dono vai te dar um bônus."); } }] },
+      ch: [{ t: "Assinar o relatório", go: null, fx: () => { F().fiscalFim = "ok"; S.fiscalBonus = 25; people("A fiscal da vigilância aprovou a loja. O dono vai te dar um bônus."); } }] },
     bad: { t: () => `Ela anota tudo, sem pressa.\n— ${inspectionProblems()}. Vou ter que aplicar uma multa de ${money(40)}.`,
-      ch: [{ t: "Assinar o relatório", go: null, fx: () => { caixaOut(40); people("A fiscal da vigilância multou o posto em R$ 40 por causa da sujeira."); } }] },
+      ch: [{ t: "Assinar o relatório", go: null, fx: () => { F().fiscalFim = "multa"; caixaOut(40); people("A fiscal da vigilância multou o posto em R$ 40 por causa da sujeira."); } }] },
   } },
   fornecedor: { who: "lourenco", start: "a", nodes: {
-    a: { t: "Um caminhãozinho da distribuidora estaciona no pátio. Seu Lourenço entra com a nota na mão.\n— Bom dia, quase! Quer reforçar o estoque? Pagamento na hora, do caixa.",
+    a: { t: () => {
+        const n = seen("fornecedor");
+        if (n <= 1) return "Um caminhãozinho da distribuidora estaciona no pátio. Seu Lourenço entra com a nota na mão.\n— Bom dia, quase! Quer reforçar o estoque? Pagamento na hora, do caixa.";
+        if (n === 2) return "Seu Lourenço de novo, buzinando duas vezes antes de descer.\n— Bom dia, quase! " + (F().lourencoFim === "nao" ? "E hoje? Vai deixar faltar coxinha de novo?" : "Passando na rota de sempre. Vai querer o quê hoje?");
+        return pick([
+          "— Choveu tanto que a serra virou rio! — Seu Lourenço sacode o boné na porta. — Mas a entrega chegou. Reforça o estoque?",
+          "Seu Lourenço entra bocejando, com a nota na mão.\n— Última parada antes de dormir. Vai precisar de alguma coisa?",
+        ]);
+      },
       ch: [
         { t: `Pedido grande (${money(60)} do caixa): prateleiras e máquina cheias`, if: () => tillNow() >= 60, go: "done", fx: () => { caixaOut(60); S.stock = 100; S.vend = S.vend.map(() => 8); } },
         { t: `Pedido pequeno (${money(25)} do caixa): prateleiras +40`, if: () => tillNow() >= 25, go: "done", fx: () => { caixaOut(25); S.stock = Math.min(100, S.stock + 40); } },
         { t: "“Hoje não, Seu Lourenço.”", go: "nao" },
       ] },
-    done: { t: "Ele descarrega as caixas em duas viagens e deixa a nota grampeada no balcão.\n— Até semana que vem!", ch: [{ t: "Voltar ao caixa", go: null, fx: () => people("Seu Lourenço, da distribuidora, entregou mercadoria de madrugada.") }] },
-    nao: { t: "— Tá bom. Mas depois não reclama que faltou coxinha de frango!", ch: [{ t: "…", go: null }] },
+    done: { t: () => "Ele descarrega as caixas em duas viagens e deixa a nota grampeada no balcão.\n" + (seen("fornecedor") <= 1 ? "— Até semana que vem!" : "— Até amanhã, se a serra deixar!"), ch: [{ t: "Voltar ao caixa", go: null, fx: () => { F().lourencoFim = "comprou"; people("Seu Lourenço, da distribuidora, entregou mercadoria de madrugada."); } }] },
+    nao: { t: "— Tá bom. Mas depois não reclama que faltou coxinha de frango!", ch: [{ t: "…", go: null, fx: () => { F().lourencoFim = "nao"; } }] },
   } },
   phoneOrder: { who: null, label: "Telefone", start: "a", nodes: {
     a: { t: "— Alô, é do posto? Aqui é o Marcão, da transportadora. Separa três mistos quentes e um café que eu passo daqui a meia hora?",
@@ -1360,7 +1389,8 @@ function buildEvents(n) {
     ev("02:05", () => clue("historia"));
     r("02:05", "O nome dele era Ademir. Acharam a xícara dele no balcão, ainda morna. As moedas certinhas na gaveta. Nunca foi encontrado.");
     r("02:10", "O pessoal da estrada diz que ele ainda aparece às três. Pra pedir um café. Pra ver se alguém fica no lugar dele.");
-    ev("02:45", () => { if ((F().cidaTalk || 0) >= 2) story("cida3"); });
+    // Once she promised (or knows him from your talks), she comes on the last night.
+    ev("02:45", () => { if (F().cidaKnows || (F().cidaTalk || 0) >= 2) story("cida3"); });
     r("02:59", "Três horas. Seja gentil com quem aparecer.");
     ev("03:00", () => { if (F().slept5) { note("Às três você estava dormindo. O sino tocou? Você não sabe."); return; } story("srFinal"); });
     ev("04:44", () => { S.reflection = 40; clue("reflexo"); note("No vidro, por um instante, tinha alguém de chapéu do seu lado."); });
@@ -1375,6 +1405,9 @@ const RANDOM_EVENTS = {
   ladrao: () => story("ladrao"), ze: () => story("ze"), fiscal: () => story("fiscal"),
   fornecedor: () => story("fornecedor"), apagao: () => outage(), telefone: () => phoneRing(),
 };
+// How many times a random event has run this playthrough; its lines change with each visit.
+const seen = (id) => (F().seen || {})[id] || 0;
+function markSeen(id) { const s = F().seen || (F().seen = {}); s[id] = (s[id] || 0) + 1; }
 const ODD = {
   yard: () => { S.extras.yard = 45; if (!S.awayMode) note("Tinha alguém parado no pátio, na chuva, olhando pra loja. Quando você olhou de novo, não tinha ninguém."); },
   prints: () => { S.extras.prints = S.min + 40; if (!S.awayMode) note("Pegadas molhadas da porta até o balcão. Ninguém tinha entrado."); },
@@ -1387,10 +1420,12 @@ function addRandomEvents(n, E) {
     for (let k = 0; k < 50; k++) { const t = Math.round(rand(at(from), at(to))); if (taken.every((b) => Math.abs(b - t) > 14)) { taken.push(t); return t; } }
     return null;
   };
-  const pool = ["ladrao", "ze", "fiscal", "apagao", "telefone", "fornecedor"].sort(() => Math.random() - 0.5);
+  // Events seen fewer times come first, so the same visitor does not show up every night.
+  const pool = ["ladrao", "ze", "fiscal", "apagao", "telefone", "fornecedor"]
+    .map((id) => ({ id, w: seen(id) + Math.random() * 1.5 })).sort((a, b) => a.w - b.w).map((x) => x.id);
   for (const id of pool.slice(0, n === 1 ? 2 : 3)) {
     const t = id === "fornecedor" ? slot("05:00", "05:35") : slot("23:30", "04:50");
-    if (t != null) E.push({ at: t, run: RANDOM_EVENTS[id] });
+    if (t != null) E.push({ at: t, run: () => { markSeen(id); RANDOM_EVENTS[id](); } });
   }
   const t2 = slot("00:30", "04:30"); const odd = pick(Object.keys(ODD));
   if (t2 != null) E.push({ at: t2, run: ODD[odd] });
@@ -1485,6 +1520,9 @@ function spawn(c) {
   if (S.fast) S.fast = false;
   if (!S.customer) { S.customer = c; c.upAt = S.min; } else S.queue.push(c);
 }
+// The clock can speed up when nobody at the counter still needs you.
+const attended = (c) => !!(c.served || c.leaving || (c.preparing && c.preparing !== "player"));
+const canWait = () => !S.paused && !S.dozing && !(S.frozen > 0) && (!S.customer || attended(S.customer)) && S.queue.every(attended);
 // A customer can be served once they reach the counter: after the walk-in animation, or one game minute.
 const ready = (c) => c.enter >= 1 || S.min - (c.upAt ?? S.min) >= 1;
 // The customer at the counter is gone; the next one in line steps up.
@@ -1511,7 +1549,7 @@ const MISSED = {
   ladrao: () => { S.stock = Math.max(0, S.stock - 8); people("Um rapaz de moletom saiu com chocolate no bolso sem passar no caixa."); },
   ze: () => people("Seu Zé esperou um café fiado no balcão e foi embora cantando."),
   zePaga: () => { S.cash += 20; people("Seu Zé deixou vinte reais no balcão pra pagar o fiado."); },
-  fiscal: () => { if (inspectionPasses()) S.fiscalBonus = 25; else caixaOut(40); people(inspectionPasses() ? "A fiscal da vigilância inspecionou a loja sozinha e aprovou." : "A fiscal da vigilância inspecionou a loja sozinha e multou o posto em R$ 40."); },
+  fiscal: () => { F().fiscalFim = inspectionPasses() ? "ok" : "multa"; if (inspectionPasses()) S.fiscalBonus = 25; else caixaOut(40); people(inspectionPasses() ? "A fiscal da vigilância inspecionou a loja sozinha e aprovou." : "A fiscal da vigilância inspecionou a loja sozinha e multou o posto em R$ 40."); },
   fornecedor: () => people("Seu Lourenço, da distribuidora, esperou e foi embora sem entregar nada."),
   homem2: () => people("O homem do carro preto esperou no balcão, olhando o estoque, e foi embora."),
   excursao: () => people("A guia de uma excursão esperou no balcão. O ônibus foi embora sem ninguém descer."),
@@ -1615,10 +1653,12 @@ function quote(items) {
   }
   return { total, got };
 }
-// The customer pays with a note and you pick the change. Pix needs no change.
+// The customer pays with a note and you pick the change. Pix and small notes need no question.
+const changeNote = (total) => [5, 10, 20, 50, 100].find((v) => v > total);
+function asksChange(c) { const { total } = quote(c.items); return total > 0 && changeNote(total) >= 20 && Math.random() < 0.35; }
 function changeDialog(c) {
   const { total, got } = quote(c.items);
-  const note = [5, 10, 20, 50, 100].find((v) => v > total);
+  const note = changeNote(total);
   const right = note - total;
   // two wrong amounts near the right one (never negative), always terminates
   const wrong = [-5, -2, -1, 1, 2, 5].map((d) => right + d).filter((v) => v >= 0).sort(() => Math.random() - 0.5).slice(0, 2);
@@ -1654,7 +1694,7 @@ function serve() {
     return;
   }
   if (S.task) cancelTask();
-  if (quote(c.items).total > 0 && Math.random() > 0.3) { openDialog(changeDialog(c), () => { serveFiller(c, false); settleChange(c); }); return; }
+  if (asksChange(c)) { openDialog(changeDialog(c), () => { serveFiller(c, false); settleChange(c); }); return; }
   serveFiller(c, false);
 }
 function serveFiller(c, byHelper) {
@@ -2179,7 +2219,7 @@ function endNight() {
   if (S.helper.active) S.people.push(`Juninho fez ${S.helper.done} tarefa${S.helper.done === 1 ? "" : "s"} e atendeu ${S.helper.served} cliente${S.helper.served === 1 ? "" : "s"} por você.`);
   fillList("#sumPeople", S.people.length ? S.people : ["Ninguém que você vá lembrar amanhã."]);
   fillList("#sumOdd", S.notes.length ? S.notes : ["Nada. Pelo menos nada que você tenha percebido."]);
-  $("#summary").hidden = false; $("#nextBtn").focus();
+  showScreen("#summary", "#nextBtn");
 }
 const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
 function renderPay(p) {
@@ -2229,6 +2269,8 @@ function renderShop() {
     d.appendChild(b); shop.appendChild(d);
   }
 }
+// Open an overlay at its top; focusing its bottom button must not scroll the heading away.
+function showScreen(sel, focusSel) { const el = $(sel); el.hidden = false; el.scrollTop = 0; $(focusSel).focus({ preventScroll: true }); }
 function fillList(sel, items) { const ul = $(sel); ul.innerHTML = ""; items.forEach((t) => { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); }); }
 
 function showEnding() {
@@ -2277,7 +2319,10 @@ function showEnding() {
   if (f.rochaSr) ep.push(f.photo ? "O policial Rocha reabriu o caso de 1987. A foto da equipe ficou com você, guardada na segunda gaveta." : "O policial Rocha reabriu o caso de 1987. Pela primeira vez, alguém disse ter visto o chapéu.");
   if (f.tiagoGift) ep.push("A equipe da ambulância do Tiago ainda para no posto em todo plantão de feriado.");
   if (f.helperMode) ep.push(f.srAccepted ? "Juninho voltou pra escola. Diz pra todo mundo que o colega do turno da noite ficou estranho no fim da semana." : "Juninho voltou pra escola. Diz que vai trabalhar no posto de novo nas férias, mas só se for com você.");
-  if ((f.cidaTalk || 0) >= 1) ep.push(f.reencontro ? "Dona Cida não voltou mais ao posto. Não precisava." : "Dona Cida continua vindo, toda madrugada, sentar na mesa da janela.");
+  if (f.reencontro) ep.push("Dona Cida não voltou mais ao posto. Não precisava.");
+  else if (f.cidaKnows && f.cidaCame) ep.push("Dona Cida cumpriu a promessa e veio na última noite. Esperou na mesa da janela até o sol nascer. Ele não foi até ela, e ela diz que tudo bem: trinta e nove anos ensinam a esperar.");
+  else if (f.cidaKnows) ep.push("Dona Cida não chegou a tempo na última noite. Ela ainda pergunta, toda vez que passa, se o senhor de chapéu voltou.");
+  else if ((f.cidaTalk || 0) >= 1) ep.push("Dona Cida continua vindo, toda madrugada, sentar na mesa da janela.");
   ep.push(f.srAccepted ? "O senhor de chapéu nunca mais foi visto. O chapéu dele está com você." : f.srRoad ? "Às vezes, na neblina, uma lanterna balança antes da curva do 220." : (f.srFreed || f.reencontro) ? "O senhor de chapéu não voltou. A Madrugada FM também não." : "Dizem que às três ainda aparece alguém pedindo café preto.");
   const w = G.wallet || 0; const bought = UPGRADES.filter((u) => has(u.id)).map((u) => u.n.toLowerCase());
   ep.push(`O caixa do posto fechou as oito noites com ${money(G.till || 0)}${bought.length ? `, e a loja ganhou ${bought.join(", ")}` : ""}.`);
@@ -2286,7 +2331,7 @@ function showEnding() {
   fillList("#endPeople", ep);
   const found = ENDINGS.filter((e) => META.endings[e.id]).length;
   $("#endCount").textContent = `Finais descobertos: ${found} de ${ENDINGS.length} · Pistas: ${Object.keys(G.clues || {}).length} nesta partida, ${Object.keys(META.clues).length} de ${CLUE_COUNT} no total`;
-  $("#ending").hidden = false; $("#againBtn").focus();
+  showScreen("#ending", "#againBtn");
   try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
 }
 
@@ -2934,6 +2979,7 @@ function frame(now) {
    ========================================================= */
 function gauge(id, v, low) { const g = $(id); g.querySelector("b").textContent = Math.round(v); g.querySelector("i").style.width = clamp(v, 0, 100) + "%"; g.classList.toggle("low", v < low); }
 const TASK_SUB = (k) => `${Math.round(taskDur(k))} min`;
+const TASK_FULL = { brew: "Bule cheio", stock: "Prateleiras cheias", sweep: "Chão limpo", heat: "Estufa cheia", tables: "Mesas limpas", refill: "Máquina cheia" };
 function renderUI() {
   const clk = $("#clock"); clk.textContent = displayClock(); clk.classList.toggle("frozen", S.frozen > 0);
   gauge("#gEnergy", S.energy, 30); gauge("#gPot", S.pot, 20); gauge("#gEstufa", S.estufa, 13); gauge("#gStock", S.stock, 20);
@@ -2956,16 +3002,19 @@ function renderUI() {
     const k = b.dataset.task; const run = S.task && S.task.kind === k;
     b.classList.toggle("running", run); b.querySelector(".prog").style.width = run ? (S.task.done / S.task.dur * 100) + "%" : "0";
     const full = { brew: S.pot >= 80, stock: S.stock >= 95, sweep: S.dirt < 5, heat: S.estufa >= 75, tables: avg(S.tables) < 3, refill: S.vend.every((q) => q >= 6) }[k];
-    b.disabled = busy || (!run && full) || (!!S.outage && ["brew", "heat", "refill"].includes(k));
-    b.querySelector("small").textContent = run ? "Clique para parar" : TASK_SUB(k);
+    const noPower = !!S.outage && ["brew", "heat", "refill"].includes(k);
+    b.disabled = busy || (!run && full) || noPower;
+    b.querySelector("small").textContent = run ? "Clique para parar" : S.dozing ? "Você cochilou" : noPower ? "Sem luz" : full ? TASK_FULL[k] : TASK_SUB(k);
   });
   $("#aDrink").disabled = busy || S.pot < CUP();
+  if (!busy) $("#aDrink").querySelector("small").textContent = S.pot < CUP() ? "Bule vazio" : "+ energia";
   $("#aVend").disabled = busy;
   $("#aVend").querySelector("small").textContent = `${S.vend.reduce((a, b) => a + b, 0)} itens na máquina`;
   $("#aTv").disabled = busy;
   $("#tvSub").textContent = S.tvOverride ? "Chiado…" : TV_CHANNELS[S.tv.ch];
-  const wait = $("#aWait"); wait.disabled = busy || S.frozen > 0 || !!c;
-  wait.querySelector("b").textContent = S.fast ? "Normal" : "Esperar"; wait.querySelector("small").textContent = S.fast ? "Voltar ao ritmo" : "Acelera o relógio";
+  const wait = $("#aWait"); wait.disabled = !canWait();
+  if (S.fast && !canWait()) S.fast = false;
+  wait.querySelector("b").textContent = S.fast ? "Normal" : "Esperar"; wait.querySelector("small").textContent = S.fast ? "Voltar ao ritmo" : (c && !attended(c)) || !S.queue.every(attended) ? "Atenda o cliente antes" : "Acelera o relógio";
   // contextual actions for this room
   const box = $("#actions");
   box.querySelectorAll(".ctx").forEach((el) => { const x = S.ctx.find((y) => y.id === el.dataset.id); if (!x || (x.view && x.view !== S.view)) el.remove(); });
@@ -3049,7 +3098,7 @@ function openJournal(tab) {
   journalTab = tab || "clues"; journalOpen = true; journalBack = document.activeElement;
   if (S) S.fast = false;
   renderJournal();
-  $("#journal").hidden = false; $("#journalBtn .dot").hidden = true; $("#jClose").focus();
+  showScreen("#journal", "#jClose"); $("#journalBtn .dot").hidden = true;
 }
 function closeJournal() {
   journalOpen = false; $("#journal").hidden = true;
@@ -3070,7 +3119,7 @@ $$("#actions .act[data-task]").forEach((b) => b.addEventListener("click", () => 
 $("#aDrink").addEventListener("click", drink);
 $("#aVend").addEventListener("click", openVend);
 $("#aTv").addEventListener("click", () => { if (S.paused) return; S.tv.ch = (S.tv.ch + 1) % TV_CHANNELS.length; audio.beep(); renderUI(); });
-$("#aWait").addEventListener("click", () => { if (!S.paused && !S.customer) S.fast = !S.fast; });
+$("#aWait").addEventListener("click", () => { if (S.fast || canWait()) S.fast = !S.fast; });
 $("#vendClose").addEventListener("click", closeVend);
 $("#helperSel").addEventListener("change", (e) => { const k = e.target.value; e.target.value = ""; if (k && S) helperAssign(k); });
 $("#helperMode").addEventListener("click", () => { if (!S) return; F().helperMode = F().helperMode === "auto" ? "manual" : "auto"; renderUI(); });
