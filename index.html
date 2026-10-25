@@ -944,14 +944,19 @@ const DIALOGS = {
         nao: "Seu Zé encosta no balcão, rindo antes de falar.\n— Já sei, já sei: regra é regra. Mas olha essa chuva… Um café e um pão de queijo, e amanhã eu acerto. Palavra de honra.",
       })[F().zeFim] || "Seu Zé, conhecido de todo posto da serra, entra cantando baixinho.\n— Ô meu filho… um café e um pão de queijo. Mas hoje tô sem nada. Anota aí no caderno que amanhã eu pago, palavra de honra.",
       ch: [
-        { t: "Anotar no caderno (fiado)", go: "fiado", fx: () => { F().zeFiado = S.night; F().zeFim = "fiado"; if (hasCoffee()) S.pot -= CUP(); if (hasSnack()) S.estufa -= SNACK(); } },
+        { t: "Anotar no caderno (fiado)", go: "fiado", fx: () => { F().zeFiado = S.night; F().zeFim = "fiado"; inc("zeFiados"); if (hasCoffee()) S.pot -= CUP(); if (hasSnack()) S.estufa -= SNACK(); } },
         { t: "Pagar do seu bolso (R$ 11,00)", go: "pago", fx: () => { F().zeFim = "pago"; G.wallet = (G.wallet || 0) - 11; sell(["cafe", "pao"]); } },
         { t: "“Sem dinheiro, sem café, Seu Zé.”", go: "nao", fx: () => { F().zeFim = "nao"; } },
       ] },
-    fiado: { t: "— Deus te pague! Amanhã eu volto, pode escrever.\nEle toma o café devagar, contando uma história de caminhão que você não entende direito.",
+    fiado: { t: () => [
+        "— Deus te pague! Amanhã eu volto, pode escrever.\nEle toma o café devagar, contando uma história de caminhão que você não entende direito.",
+        "— Você é dos bons, menino. Eu sei que o caderno tá ficando cheio, mas eu pago, eu pago.\nEle conta de novo a história do caminhão, agora com outro final.",
+        "— Esse caderno ainda vira livro, hein? — Ele ri sozinho.\nToma o café em pé, encostado no balcão, olhando a chuva.",
+      ][Math.min(F().zeFiados || 1, 3) - 1],
       ch: [{ t: "Voltar ao caixa", go: null, fx: () => people("Seu Zé tomou café fiado e jurou pagar na noite seguinte.") }] },
     pago: { t: "— Você é um anjo, menino. Um anjo de uniforme.", ch: [{ t: "Voltar ao caixa", go: null, fx: () => people("Você pagou o café do Seu Zé do seu bolso.") }] },
-    nao: { t: "Ele ri, sem se ofender.\n— Tá certo, tá certo. Regra é regra.\nE vai embora cantando.", ch: [{ t: "…", go: null, fx: () => people("Seu Zé quis café fiado. Você disse que não.") }] },
+    nao: { t: () => (seen("ze") <= 1 ? "Ele ri, sem se ofender.\n— Tá certo, tá certo. Regra é regra.\nE vai embora cantando."
+        : "— Tá certo. Amanhã eu trago a carteira. — Ele pisca. — Se eu achar ela.\nE sai na chuva cantando a mesma música."), ch: [{ t: "…", go: null, fx: () => people("Seu Zé quis café fiado. Você disse que não.") }] },
   } },
   zePaga: { who: "ze", start: "a", nodes: {
     a: { t: "Seu Zé aparece de cabelo penteado e camisa limpa.\n— Falei que voltava!\nEle põe uma nota de vinte no balcão.\n— Fica com o troco. Pelo fiado e pela paciência.",
@@ -965,9 +970,19 @@ const DIALOGS = {
         return "A fiscal já entra cumprimentando, sacudindo o guarda-chuva.\n— Boa noite de novo. Você já sabe como funciona: chão e mesas.";
       },
       ch: [{ t: "Acompanhar a inspeção", go: () => (inspectionPasses() ? "ok" : "bad") }] },
-    ok: { t: "Ela passa o dedo no balcão, olha as mesas, abre a estufa e o bule.\n— Tudo em ordem. Vou anotar um elogio pro dono. É raro de madrugada.",
+    ok: { t: () => {
+        const n = seen("fiscal"), before = F().fiscalFim;
+        if (n <= 1) return "Ela passa o dedo no balcão, olha as mesas, abre a estufa e o bule.\n— Tudo em ordem. Vou anotar um elogio pro dono. É raro de madrugada.";
+        if (before === "multa") return "Ela confere o chão, as mesas e o bule, devagar.\n— Bem melhor que da outra vez. Vou anotar um elogio pro dono.";
+        return n === 2 ? "Ela olha as mesas, cheira o café e fecha a prancheta.\n— Continua impecável. Elogio pro dono de novo."
+          : "Ela nem tira o guarda-chuva da mão.\n— Tudo nos trinques, como sempre. Já vou anotar o elogio.";
+      },
       ch: [{ t: "Assinar o relatório", go: null, fx: () => { F().fiscalFim = "ok"; S.fiscalBonus = 25; people("A fiscal da vigilância aprovou a loja. O dono vai te dar um bônus."); } }] },
-    bad: { t: () => `Ela anota tudo, sem pressa.\n— ${inspectionProblems()}. Vou ter que aplicar uma multa de ${money(40)}.`,
+    bad: { t: () => {
+        const n = seen("fiscal"), before = F().fiscalFim;
+        const start = n <= 1 ? "Ela anota tudo, sem pressa." : before === "multa" ? "Ela suspira e vira a página da prancheta.\n— De novo?" : "Ela franze a testa.\n— Ih. Da outra vez estava tão bom…";
+        return `${start}\n— ${inspectionProblems()}. Vou ter que aplicar uma multa de ${money(40)}.`;
+      },
       ch: [{ t: "Assinar o relatório", go: null, fx: () => { F().fiscalFim = "multa"; caixaOut(40); people("A fiscal da vigilância multou o posto em R$ 40 por causa da sujeira."); } }] },
   } },
   fornecedor: { who: "lourenco", start: "a", nodes: {
@@ -985,7 +1000,11 @@ const DIALOGS = {
         { t: `Pedido pequeno (${money(25)} do caixa): prateleiras +40`, if: () => tillNow() >= 25, go: "done", fx: () => { caixaOut(25); S.stock = Math.min(100, S.stock + 40); } },
         { t: "“Hoje não, Seu Lourenço.”", go: "nao" },
       ] },
-    done: { t: () => "Ele descarrega as caixas em duas viagens e deixa a nota grampeada no balcão.\n" + (seen("fornecedor") <= 1 ? "— Até semana que vem!" : "— Até amanhã, se a serra deixar!"), ch: [{ t: "Voltar ao caixa", go: null, fx: () => { F().lourencoFim = "comprou"; people("Seu Lourenço, da distribuidora, entregou mercadoria de madrugada."); } }] },
+    done: { t: () => (seen("fornecedor") <= 1 ? "Ele descarrega as caixas em duas viagens e deixa a nota grampeada no balcão.\n— Até semana que vem!"
+        : pick([
+          "Ele empilha as caixas no estoque assobiando e deixa a nota no balcão.\n— Até amanhã, se a serra deixar!",
+          "Duas viagens debaixo de chuva, e as prateleiras ficam cheias de novo.\n— Coxinha de frango, como você gosta. Até a próxima!",
+        ])), ch: [{ t: "Voltar ao caixa", go: null, fx: () => { F().lourencoFim = "comprou"; people("Seu Lourenço, da distribuidora, entregou mercadoria de madrugada."); } }] },
     nao: { t: "— Tá bom. Mas depois não reclama que faltou coxinha de frango!", ch: [{ t: "…", go: null, fx: () => { F().lourencoFim = "nao"; } }] },
   } },
   phoneOrder: { who: null, label: "Telefone", start: "a", nodes: {
@@ -1407,7 +1426,10 @@ const RANDOM_EVENTS = {
 };
 // How many times a random event has run this playthrough; its lines change with each visit.
 const seen = (id) => (F().seen || {})[id] || 0;
-function markSeen(id) { const s = F().seen || (F().seen = {}); s[id] = (s[id] || 0) + 1; }
+function markSeen(id) { const s = F().seen || (F().seen = {}); s[id] = (s[id] || 0) + 1; (F().seenNight || (F().seenNight = {}))[id] = S.night; }
+// Visitors with a face skip the night right after they came.
+const VISITORS = ["ladrao", "ze", "fiscal"];
+const cameLastNight = (id, n) => VISITORS.includes(id) && (F().seenNight || {})[id] === n - 1;
 const ODD = {
   yard: () => { S.extras.yard = 45; if (!S.awayMode) note("Tinha alguém parado no pátio, na chuva, olhando pra loja. Quando você olhou de novo, não tinha ninguém."); },
   prints: () => { S.extras.prints = S.min + 40; if (!S.awayMode) note("Pegadas molhadas da porta até o balcão. Ninguém tinha entrado."); },
@@ -1421,7 +1443,7 @@ function addRandomEvents(n, E) {
     return null;
   };
   // Events seen fewer times come first, so the same visitor does not show up every night.
-  const pool = ["ladrao", "ze", "fiscal", "apagao", "telefone", "fornecedor"]
+  const pool = ["ladrao", "ze", "fiscal", "apagao", "telefone", "fornecedor"].filter((id) => !cameLastNight(id, n))
     .map((id) => ({ id, w: seen(id) + Math.random() * 1.5 })).sort((a, b) => a.w - b.w).map((x) => x.id);
   for (const id of pool.slice(0, n === 1 ? 2 : 3)) {
     const t = id === "fornecedor" ? slot("05:00", "05:35") : slot("23:30", "04:50");
@@ -1590,6 +1612,8 @@ function seatPerson(p, minutes, prefer) {
   S.seated.push({ ...p, seat, until: S.min + minutes, enter: 0 });
   return true;
 }
+// Someone seated wants a word: say so when the player is looking at the till.
+function callFromSalao(text) { if (S.view !== "salao" && !S.awayMode) toast(text); }
 // Called from a dialogue: when the conversation ends, the customer at the till goes to sit down.
 function seatAfter(minutes, storyId, extra = {}) {
   if (S.customer) S.customer.seatAfter = { minutes, storyId, extra };
@@ -1601,9 +1625,9 @@ function seatStory(c) {
   if (!ok) { toast(`${c.name} não achou mesa limpa e foi embora.`); return; }
   if (storyId === "cida") {
     const talk = { 1: "cidaTalk1", 3: "cidaTalk2", 6: "cidaTalk3" }[S.night] || null;
-    if (talk) addCtx({ id: "talk-cida", view: "salao", label: "Conversar com Dona Cida", sub: "Mesa da janela", until: S.min + minutes - 2, run: () => openDialog(DIALOGS[talk]) });
+    if (talk) { addCtx({ id: "talk-cida", view: "salao", label: "Conversar com Dona Cida", sub: "Mesa da janela", until: S.min + minutes - 2, run: () => openDialog(DIALOGS[talk]) }); callFromSalao("Dona Cida te chamou da mesa da janela. Vá até o salão."); }
   }
-  if (storyId === "tiago" && S.night === 2) addCtx({ id: "talk-tiago", view: "salao", label: "Falar com o Tiago", sub: "Mesa do canto", until: S.min + minutes - 2, run: () => openDialog(DIALOGS.tiagoTalk) });
+  if (storyId === "tiago" && S.night === 2) { addCtx({ id: "talk-tiago", view: "salao", label: "Falar com o Tiago", sub: "Mesa do canto", until: S.min + minutes - 2, run: () => openDialog(DIALOGS.tiagoTalk) }); callFromSalao("O Tiago acenou da mesa do canto. Vá até o salão."); }
   if (storyId === "tiago" && extra.sleeping) addCtx({ id: "wake-tiago", view: "salao", label: "Acordar o Tiago", sub: "Estágio às sete", until: at("05:58"), run: () => { wakeTiago(true); }, expire: () => {} });
 }
 // Called from a dialogue: a group (the band, the pilgrims) takes several seats when the talk ends.
