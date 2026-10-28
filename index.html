@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1216">
 <meta name="description" content="Turno das 3h: oito noites no caixa de um posto na serra. Um jogo de mistério no navegador.">
+<link rel="alternate" hreflang="en" href="en/">
+<script>
+  // English speakers (or anyone who picked English) go to the English page.
+  try { const l = localStorage.getItem("turno3h-lang"); if (l === "en" || (!l && !/^pt/i.test(navigator.language || "pt"))) location.replace("en/"); } catch (e) {}
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -320,6 +325,8 @@ button { font: inherit; color: inherit; }
   .radio.live .freq i { animation: none; }
   .lids::before, .lids::after { transition: none; }
 }
+.lang { margin-top: 14px; }
+.lang .btn.ghost[aria-pressed="true"] { border-color: var(--sodium); color: var(--sodium); }
 </style>
 
 <div id="app">
@@ -420,6 +427,11 @@ button { font: inherit; color: inherit; }
     <div class="row">
       <label class="opt"><input type="checkbox" id="optVoice"> Voz do locutor (sintetizada, se o navegador tiver)</label>
       <label class="opt"><input type="checkbox" id="optLight"> Gráficos leves (para notebooks mais simples)</label>
+    </div>
+    <div class="row lang" role="group" aria-label="Idioma">
+      <span class="opt">Idioma:</span>
+      <button class="btn small ghost" type="button" data-lang="pt" aria-pressed="true">Português</button>
+      <button class="btn small ghost" type="button" data-lang="en" aria-pressed="false">English</button>
     </div>
   </div>
 </div>
@@ -3168,6 +3180,12 @@ $("#soundBtn").addEventListener("click", () => { audio.resume(); const on = audi
 $("#optLight").checked = LIGHT;
 $("#optLight").addEventListener("change", (e) => setLight(e.target.checked, true));
 $("#optVoice").addEventListener("change", (e) => { voiceOn = e.target.checked; if (!voiceOn && "speechSynthesis" in window) speechSynthesis.cancel(); });
+
+// Language: the choice is remembered on this device; both pages share the same save.
+$$(".lang [data-lang]").forEach((b) => b.addEventListener("click", () => {
+  try { localStorage.setItem("turno3h-lang", b.dataset.lang); } catch (e) {}
+  if (b.getAttribute("aria-pressed") !== "true") location.href = b.dataset.lang === "en" ? "en/" : "./";
+}));
 
 const saved = load();
 if (saved && saved.night > 1) { const b = $("#continueBtn"); b.hidden = false; b.textContent = `Continuar: noite ${saved.night}`; }

@@ -1,6 +1,6 @@
 // Offline support: the game page comes from the network when online (so updates arrive) and from the cache otherwise.
-const CACHE = "turno-v9";
-const CORE = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
+const CACHE = "turno-v10";
+const CORE = ["./", "index.html", "en/", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
@@ -11,8 +11,10 @@ self.addEventListener("fetch", (e) => {
   const fonts = url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com";
   if (url.origin !== location.origin && !fonts) return;
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put("index.html", copy)); return res; })
-      .catch(() => caches.match("index.html")));
+    // each page (Portuguese at the root, English under en/) is cached under its own address
+    const page = url.pathname.replace(/index\.html$/, "");
+    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(page, copy)); return res; })
+      .catch(() => caches.match(page).then((hit) => hit || caches.match("./"))));
     return;
   }
   // icons, manifest and fonts: cache first, filled on first use
